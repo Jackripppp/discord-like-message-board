@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 const DATA_FILE = path.join(__dirname, 'messages.json');
 const MAX_MESSAGES = 500;
 
