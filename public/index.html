@@ -432,22 +432,31 @@
       }
 
       // Edit/Delete buttons for your own messages
-      if (msg.userId === currentUserId) {
-        const btnDiv = document.createElement('div');
-        btnDiv.className = 'msg-buttons';
+      // Buttons container
+const btnDiv = document.createElement('div');
+btnDiv.className = 'msg-buttons';
 
-        const editBtn = document.createElement('button');
-        editBtn.textContent = 'Edit';
-        editBtn.onclick = () => editMessage(msg.id, text, msg);
-        btnDiv.appendChild(editBtn);
+// Reply button (for everyone)
+const replyBtn = document.createElement('button');
+replyBtn.textContent = 'Reply';
+replyBtn.onclick = () => setReply(msg);
+btnDiv.appendChild(replyBtn);
 
-        const delBtn = document.createElement('button');
-        delBtn.textContent = 'Delete';
-        delBtn.onclick = () => deleteMessage(msg.id);
-        btnDiv.appendChild(delBtn);
+// Only add Edit/Delete if it's your message
+if (msg.userId === currentUserId) {
+  const editBtn = document.createElement('button');
+  editBtn.textContent = 'Edit';
+  editBtn.onclick = () => editMessage(msg.id, text, msg);
+  btnDiv.appendChild(editBtn);
 
-        div.appendChild(btnDiv);
-      }
+  const delBtn = document.createElement('button');
+  delBtn.textContent = 'Delete';
+  delBtn.onclick = () => deleteMessage(msg.id);
+  btnDiv.appendChild(delBtn);
+}
+
+div.appendChild(btnDiv);
+
 
       messageBoard.appendChild(div);
       if (autoScroll) messageBoard.scrollTop = messageBoard.scrollHeight;
