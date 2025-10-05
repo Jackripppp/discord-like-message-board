@@ -354,13 +354,104 @@
       autoScroll = true;
     });
 
-    function highlightMessage(id) {
-      const div = document.querySelector(`[data-id="${id}"]`);
-      if (div) {
-        div.style.background = '#5865f2';
-        setTimeout(() => div.style.background = '#2b2d31', 800);
-        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    function addMessage(msg) {
+      if (msg.deleted) return;
+      const div = document.createElement('div');
+      div.className = 'message';
+      div.dataset.id = msg.id;
+
+      // Reply box
+      if (msg.replyTo) {
+        const replyBox = document.createElement('div');
+        replyBox.className = 'reply-box';
+        const r = msg.replyTo;
+        if (r.attachments && r.attachments.length) {
+          const firstAtt = r.attachments[0];
+          if (firstAtt.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = firstAtt.url;
+            img.style.maxWidth = '40px';
+            img.style.maxHeight = '40px';
+            img.style.borderRadius = '4px';
+            replyBox.appendChild(img);
+          } else {
+            const fileSpan = document.createElement('span');
+            fileSpan.textContent = `📄 ${firstAtt.name || '(file)'}`;
+            replyBox.appendChild(fileSpan);
+          }
+        } else {
+          replyBox.textContent = r.text || '(no content)';
+        }
+        replyBox.onclick = () => highlightMessage(r.id);
+        div.appendChild(replyBox);
       }
+
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = msg.name || 'Anonymous';
+      div.appendChild(name);
+
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = msg.text || '';
+      if (msg.edited) {
+        const editedTag = document.createElement('span');
+        editedTag.className = 'edited-tag';
+        editedTag.textContent = '(edited)';
+        text.appendChild(editedTag);
+      }
+      div.appendChild(text);
+
+      // Attachments
+      if (msg.attachments && msg.attachments.length) {
+        msg.attachments.forEach(att => {
+          if (att.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = att.url;
+            img.className = 'attachment-thumb';
+            img.onclick = () => openImageModal(att.url);
+            div.appendChild(img);
+          } else {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'attachment-file';
+            const link = document.createElement('a');
+            link.href = att.url;
+            link.download = att.name;
+            link.textContent = att.name;
+            link.style.color = '#9cdcfe';
+            link.style.textDecoration = 'none';
+            link.target = '_blank';
+            const icon = document.createElement('i');
+            icon.textContent = '📄';
+            icon.style.marginRight = '6px';
+            fileDiv.appendChild(icon);
+            fileDiv.appendChild(link);
+            div.appendChild(fileDiv);
+          }
+        });
+      }
+
+      // Edit/Delete buttons for your own messages
+      if (msg.userId === currentUserId) {
+        const btnDiv = document.createElement('div');
+        btnDiv.className = 'msg-buttons';
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = () => editMessage(msg.id, text, msg);
+        btnDiv.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = () => deleteMessage(msg.id);
+        btnDiv.appendChild(delBtn);
+
+        div.appendChild(btnDiv);
+      }
+
+      messageBoard.appendChild(div);
+      if (autoScroll) messageBoard.scrollTop = messageBoard.scrollHeight;
+      updateMessageCounter();
     }
 
     function setReply(msg) {
@@ -403,86 +494,13 @@
       previewContainer.appendChild(preview);
     }
 
-    function addMessage(msg) {
-      if (msg.deleted) return;
-      const div = document.createElement('div');
-      div.className = 'message';
-      div.dataset.id = msg.id;
-
-      if (msg.replyTo) {
-        const replyBox = document.createElement('div');
-        replyBox.className = 'reply-box';
-        const r = msg.replyTo;
-
-        if (r.attachments && r.attachments.length) {
-          const firstAtt = r.attachments[0];
-          if (firstAtt.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = firstAtt.url;
-            img.style.maxWidth = '40px';
-            img.style.maxHeight = '40px';
-            img.style.borderRadius = '4px';
-            replyBox.appendChild(img);
-          } else {
-            const fileSpan = document.createElement('span');
-            fileSpan.textContent = `📄 ${firstAtt.name || '(file)'}`;
-            replyBox.appendChild(fileSpan);
-          }
-        } else {
-          replyBox.textContent = r.text || '(no content)';
-        }
-
-        replyBox.onclick = () => highlightMessage(r.id);
-        div.appendChild(replyBox);
+    function highlightMessage(id) {
+      const div = document.querySelector(`[data-id="${id}"]`);
+      if (div) {
+        div.style.background = '#5865f2';
+        setTimeout(() => div.style.background = '#2b2d31', 800);
+        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-
-      const name = document.createElement('div');
-      name.className = 'name';
-      name.textContent = msg.name || 'Anonymous';
-      div.appendChild(name);
-
-      const text = document.createElement('div');
-      text.className = 'text';
-      text.textContent = msg.text || '';
-      if (msg.edited) {
-        const editedTag = document.createElement('span');
-        editedTag.className = 'edited-tag';
-        editedTag.textContent = '(edited)';
-        text.appendChild(editedTag);
-      }
-      div.appendChild(text);
-
-      if (msg.attachments && msg.attachments.length) {
-        msg.attachments.forEach(att => {
-          if (att.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = att.url;
-            img.className = 'attachment-thumb';
-            img.onclick = () => openImageModal(att.url);
-            div.appendChild(img);
-          } else {
-            const fileDiv = document.createElement('div');
-            fileDiv.className = 'attachment-file';
-            const link = document.createElement('a');
-            link.href = att.url;
-            link.download = att.name;
-            link.textContent = att.name;
-            link.style.color = '#9cdcfe';
-            link.style.textDecoration = 'none';
-            link.target = '_blank';
-            const icon = document.createElement('i');
-            icon.textContent = '📄';
-            icon.style.marginRight = '6px';
-            fileDiv.appendChild(icon);
-            fileDiv.appendChild(link);
-            div.appendChild(fileDiv);
-          }
-        });
-      }
-
-      messageBoard.appendChild(div);
-      if (autoScroll) messageBoard.scrollTop = messageBoard.scrollHeight;
-      updateMessageCounter();
     }
 
     function openImageModal(src) {
@@ -528,7 +546,7 @@
       previewContainer.innerHTML = '';
     }
 
-    fileInput.addEventListener('change', async e => {
+    async function handleFileInput(e) {
       const files = e.target.files;
       if (!files.length) return;
 
@@ -540,6 +558,7 @@
       if (!data.ok) return alert('File upload failed');
 
       attachments = data.files;
+
       previewContainer.innerHTML = '';
       attachments.forEach(file => {
         const item = document.createElement('div');
@@ -561,7 +580,20 @@
         item.appendChild(remove);
         previewContainer.appendChild(item);
       });
-    });
+    }
+
+    fileInput.addEventListener('change', handleFileInput);
+
+    function editMessage(id, textDiv, msg) {
+      const newText = prompt('Edit your message:', msg.text);
+      if (newText === null) return;
+      socket.emit('editMessage', { id, text: newText });
+    }
+
+    function deleteMessage(id) {
+      if (!confirm('Delete this message?')) return;
+      socket.emit('deleteMessage', { id });
+    }
   </script>
 </body>
 </html>
