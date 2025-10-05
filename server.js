@@ -1,131 +1,76 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const fs = require('fs');
+const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
-const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'messages.json');
-const MAX_MESSAGES = 500;
-
-// Load messages from disk
-let messages = [];
-try {
-  if (fs.existsSync(DATA_FILE)) {
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    messages = JSON.parse(raw) || [];
-  }
-} catch (err) {
-  console.warn('Could not read messages.json:', err);
-  messages = [];
-}
-
-function persist() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Failed to persist messages:', e);
-  }
-}
-
-// Create Express app
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files in "public"
-app.use(express.static(path.join(__dirname, 'public')));
+const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// Health check
-app.get('/health', (req, res) => res.send('OK'));
-
-// Helper to trim messages
-function capMessages() {
-  if (messages.length > MAX_MESSAGES) {
-    messages = messages.slice(messages.length - MAX_MESSAGES);
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.random().toString(36).slice(2);
+    cb(null, unique + path.extname(file.originalname));
   }
-}
+});
+const upload = multer({ storage });
 
-// Socket.IO connection
-io.on('connection', (socket) => {
+app.use(express.static('public'));
+app.use('/uploads', express.static(UPLOAD_DIR));
+
+let messages = []; // In-memory storage
+
+// File upload endpoint
+app.post('/upload', upload.array('files'), (req, res) => {
+  if (!req.files) return res.json({ ok: false });
+  const files = req.files.map(f => ({
+    name: f.originalname,
+    type: f.mimetype,
+    url: `/uploads/${f.filename}`
+  }));
+  res.json({ ok: true, files });
+});
+
+// Socket.IO events
+io.on('connection', socket => {
+  // Send existing messages to new client
   socket.on('requestInit', () => {
     socket.emit('initMessages', messages);
   });
 
-  socket.on('sendMessage', (msg, ack) => {
-    try {
-      if (!msg || !msg.id || !msg.userId) return ack && ack({ ok: false, error: 'Invalid message payload' });
-
-      if (typeof msg.text === 'string' && msg.text.length > 20000) msg.text = msg.text.slice(0, 20000);
-      if (!Array.isArray(msg.attachments)) msg.attachments = [];
-
-      msg.deleted = false;
-      msg.edited = false;
-
-      messages.push(msg);
-      capMessages();
-      persist();
-
-      io.emit('messageCreated', msg);
-      ack && ack({ ok: true });
-    } catch (err) {
-      console.error('sendMessage error', err);
-      ack && ack({ ok: false, error: 'server error' });
-    }
+  // New message
+  socket.on('sendMessage', (msg, cb) => {
+    messages.push(msg);
+    io.emit('messageCreated', msg);
+    cb({ ok: true });
   });
 
-  socket.on('editMessage', (payload, ack) => {
-    try {
-      const { messageId, userId, newText } = payload || {};
-      const idx = messages.findIndex(m => m.id === messageId);
-      if (idx === -1) return ack && ack({ ok: false, error: 'Message not found' });
-
-      const msg = messages[idx];
-      if (msg.userId !== userId) return ack && ack({ ok: false, error: 'Not allowed' });
-
-      msg.text = typeof newText === 'string' ? newText : msg.text;
-      msg.edited = true;
-      msg.editTime = new Date().toISOString();
-
-      messages[idx] = msg;
-      persist();
-
-      io.emit('messageEdited', msg);
-      ack && ack({ ok: true, msg });
-    } catch (err) {
-      console.error('editMessage err', err);
-      ack && ack({ ok: false, error: 'server error' });
-    }
+  // Edit message
+  socket.on('editMessage', ({ messageId, userId, newText }, cb) => {
+    const msg = messages.find(m => m.id === messageId && m.userId === userId);
+    if (!msg) return cb({ ok: false, error: 'Message not found or not yours' });
+    msg.text = newText;
+    msg.edited = true;
+    io.emit('messageEdited', msg);
+    cb({ ok: true });
   });
 
-  socket.on('deleteMessage', (payload, ack) => {
-    try {
-      const { messageId, userId } = payload || {};
-      const idx = messages.findIndex(m => m.id === messageId);
-      if (idx === -1) return ack && ack({ ok: false, error: 'Message not found' });
-
-      const msg = messages[idx];
-      if (msg.userId !== userId) return ack && ack({ ok: false, error: 'Not allowed' });
-
-      msg.deleted = true;
-      msg.deleteTime = new Date().toISOString();
-
-      messages[idx] = msg;
-      persist();
-
-      io.emit('messageDeleted', { id: messageId, deleteTime: msg.deleteTime });
-      ack && ack({ ok: true });
-    } catch (err) {
-      console.error('deleteMessage err', err);
-      ack && ack({ ok: false, error: 'server error' });
-    }
+  // Delete message
+  socket.on('deleteMessage', ({ messageId, userId }, cb) => {
+    const index = messages.findIndex(m => m.id === messageId && m.userId === userId);
+    if (index === -1) return cb({ ok: false, error: 'Message not found or not yours' });
+    const [deleted] = messages.splice(index, 1);
+    io.emit('messageDeleted', { id: deleted.id });
+    cb({ ok: true });
   });
-
-  socket.on('disconnect', () => {});
 });
 
-// START SERVER AT THE END
-server.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`
+));
