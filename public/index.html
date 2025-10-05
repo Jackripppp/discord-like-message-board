@@ -81,6 +81,7 @@
       border-radius: 4px;
       font-size: 13px;
       color: #ccc;
+      cursor: pointer;
     }
     .reply-preview {
       background: #404249;
@@ -353,6 +354,55 @@
       autoScroll = true;
     });
 
+    function highlightMessage(id) {
+      const div = document.querySelector(`[data-id="${id}"]`);
+      if (div) {
+        div.style.background = '#5865f2';
+        setTimeout(() => div.style.background = '#2b2d31', 800);
+        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function setReply(msg) {
+      replyTo = msg;
+      previewContainer.innerHTML = '';
+
+      const preview = document.createElement('div');
+      preview.className = 'reply-preview';
+
+      if (msg.attachments && msg.attachments.length) {
+        const att = msg.attachments[0];
+        if (att.type.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = att.url;
+          preview.appendChild(img);
+        } else {
+          const fileSpan = document.createElement('span');
+          fileSpan.textContent = `📄 ${att.name}`;
+          preview.appendChild(fileSpan);
+        }
+      } else {
+        const textSpan = document.createElement('span');
+        textSpan.textContent = msg.text || '(no content)';
+        preview.appendChild(textSpan);
+      }
+
+      const close = document.createElement('span');
+      close.className = 'close-reply';
+      close.textContent = '✕';
+      close.onclick = () => {
+        replyTo = null;
+        previewContainer.innerHTML = '';
+      };
+      preview.appendChild(close);
+
+      preview.onclick = e => {
+        if (e.target !== close) highlightMessage(msg.id);
+      };
+
+      previewContainer.appendChild(preview);
+    }
+
     function addMessage(msg) {
       if (msg.deleted) return;
       const div = document.createElement('div');
@@ -363,6 +413,7 @@
         const replyBox = document.createElement('div');
         replyBox.className = 'reply-box';
         const r = msg.replyTo;
+
         if (r.attachments && r.attachments.length) {
           const firstAtt = r.attachments[0];
           if (firstAtt.type.startsWith('image/')) {
@@ -373,12 +424,14 @@
             img.style.borderRadius = '4px';
             replyBox.appendChild(img);
           } else {
-            replyBox.textContent = `📎 ${r.name || '(file)'}`;
+            const fileSpan = document.createElement('span');
+            fileSpan.textContent = `📄 ${firstAtt.name || '(file)'}`;
+            replyBox.appendChild(fileSpan);
           }
         } else {
           replyBox.textContent = r.text || '(no content)';
         }
-        replyBox.style.cursor = "pointer";
+
         replyBox.onclick = () => highlightMessage(r.id);
         div.appendChild(replyBox);
       }
@@ -399,7 +452,6 @@
       }
       div.appendChild(text);
 
-      // Attachments
       if (msg.attachments && msg.attachments.length) {
         msg.attachments.forEach(att => {
           if (att.type.startsWith('image/')) {
@@ -433,17 +485,6 @@
       updateMessageCounter();
     }
 
-    // Highlight
-    function highlightMessage(id) {
-      const div = document.querySelector(`[data-id="${id}"]`);
-      if (div) {
-        div.style.background = '#5865f2';
-        setTimeout(() => div.style.background = '#2b2d31', 800);
-        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-
-    // Image modal
     function openImageModal(src) {
       const modal = document.createElement('div');
       modal.className = 'image-modal';
@@ -454,7 +495,6 @@
       document.body.appendChild(modal);
     }
 
-    // Send message
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -488,7 +528,6 @@
       previewContainer.innerHTML = '';
     }
 
-    // File input upload
     fileInput.addEventListener('change', async e => {
       const files = e.target.files;
       if (!files.length) return;
@@ -501,7 +540,6 @@
       if (!data.ok) return alert('File upload failed');
 
       attachments = data.files;
-
       previewContainer.innerHTML = '';
       attachments.forEach(file => {
         const item = document.createElement('div');
