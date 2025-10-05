@@ -6,11 +6,10 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 const DATA_FILE = path.join(__dirname, 'messages.json');
 const MAX_MESSAGES = 500;
 
-// load messages from disk (if any)
+// Load messages from disk
 let messages = [];
 try {
   if (fs.existsSync(DATA_FILE)) {
@@ -30,53 +29,44 @@ function persist() {
   }
 }
 
+// Create Express app
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// serve static files in "public"
+// Serve static files in "public"
 app.use(express.static(path.join(__dirname, 'public')));
 
-// simple health route
+// Health check
 app.get('/health', (req, res) => res.send('OK'));
 
-// helper to trim messages
+// Helper to trim messages
 function capMessages() {
   if (messages.length > MAX_MESSAGES) {
     messages = messages.slice(messages.length - MAX_MESSAGES);
   }
 }
 
-// Socket.IO connection handling
+// Socket.IO connection
 io.on('connection', (socket) => {
-  // On connection we expect client to request initial data
-  // We'll send the current message list
   socket.on('requestInit', () => {
     socket.emit('initMessages', messages);
   });
 
-  // New message received
   socket.on('sendMessage', (msg, ack) => {
     try {
-      // msg should include: id, userId, name, text, time, attachments[]
-      // Basic validation:
-      if (!msg || !msg.id || !msg.userId) {
-        return ack && ack({ ok: false, error: 'Invalid message payload' });
-      }
-      // enforce small limits (prevent huge payloads)
-      if (typeof msg.text === 'string' && msg.text.length > 20000) msg.text = msg.text.slice(0, 20000);
+      if (!msg || !msg.id || !msg.userId) return ack && ack({ ok: false, error: 'Invalid message payload' });
 
-      // attachments: keep but sanitize: only store name, type, data (dataURL)
+      if (typeof msg.text === 'string' && msg.text.length > 20000) msg.text = msg.text.slice(0, 20000);
       if (!Array.isArray(msg.attachments)) msg.attachments = [];
 
-      msg.deleted = false; // deleted flag
-      msg.edited = false;  // edited flag
+      msg.deleted = false;
+      msg.edited = false;
 
       messages.push(msg);
       capMessages();
       persist();
 
-      // broadcast to everyone
       io.emit('messageCreated', msg);
       ack && ack({ ok: true });
     } catch (err) {
@@ -85,20 +75,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Edit a message
   socket.on('editMessage', (payload, ack) => {
-    // payload: { messageId, userId, newText }
     try {
       const { messageId, userId, newText } = payload || {};
       const idx = messages.findIndex(m => m.id === messageId);
       if (idx === -1) return ack && ack({ ok: false, error: 'Message not found' });
 
       const msg = messages[idx];
-
-      // permission check: only owner can edit
       if (msg.userId !== userId) return ack && ack({ ok: false, error: 'Not allowed' });
 
-      // apply edit
       msg.text = typeof newText === 'string' ? newText : msg.text;
       msg.edited = true;
       msg.editTime = new Date().toISOString();
@@ -114,20 +99,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Delete a message
   socket.on('deleteMessage', (payload, ack) => {
-    // payload: { messageId, userId }
     try {
       const { messageId, userId } = payload || {};
       const idx = messages.findIndex(m => m.id === messageId);
       if (idx === -1) return ack && ack({ ok: false, error: 'Message not found' });
 
       const msg = messages[idx];
-
-      // permission: only owner can delete
       if (msg.userId !== userId) return ack && ack({ ok: false, error: 'Not allowed' });
 
-      // Instead of fully removing, mark deleted (so clients that already have it can show "deleted")
       msg.deleted = true;
       msg.deleteTime = new Date().toISOString();
 
@@ -142,10 +122,10 @@ io.on('connection', (socket) => {
     }
   });
 
-  // For debugging: expose messages count on disconnect
   socket.on('disconnect', () => {});
 });
 
+// START SERVER AT THE END
 server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
