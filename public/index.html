@@ -307,6 +307,7 @@
       messageCounter.textContent = `${count} message${count !== 1 ? 's' : ''}`;
     }
 
+    // Init
     socket.emit('requestInit');
     socket.on('initMessages', msgs => {
       messageBoard.innerHTML = '';
@@ -366,13 +367,13 @@
           const firstAtt = r.attachments[0];
           if (firstAtt.type.startsWith('image/')) {
             const img = document.createElement('img');
-            img.src = firstAtt.data;
+            img.src = firstAtt.url;
             img.style.maxWidth = '40px';
             img.style.maxHeight = '40px';
             img.style.borderRadius = '4px';
             replyBox.appendChild(img);
           } else {
-            replyBox.textContent = `📎 ${r.attachments[0].name}`;
+            replyBox.textContent = `📎 ${r.name || '(file)'}`;
           }
         } else {
           replyBox.textContent = r.text || '(no content)';
@@ -398,19 +399,20 @@
       }
       div.appendChild(text);
 
+      // Attachments
       if (msg.attachments && msg.attachments.length) {
         msg.attachments.forEach(att => {
           if (att.type.startsWith('image/')) {
             const img = document.createElement('img');
-            img.src = att.data;
+            img.src = att.url;
             img.className = 'attachment-thumb';
-            img.onclick = () => openImageModal(att.data);
+            img.onclick = () => openImageModal(att.url);
             div.appendChild(img);
           } else {
             const fileDiv = document.createElement('div');
             fileDiv.className = 'attachment-file';
             const link = document.createElement('a');
-            link.href = att.data;
+            link.href = att.url;
             link.download = att.name;
             link.textContent = att.name;
             link.style.color = '#9cdcfe';
@@ -426,160 +428,33 @@
         });
       }
 
-      // Edit/Delete buttons
-      if (msg.userId === currentUserId) {
-        const btns = document.createElement('div');
-        btns.className = 'msg-buttons';
-
-        const editBtn = document.createElement('button');
-        editBtn.textContent = '✏️';
-        editBtn.title = 'Edit';
-        editBtn.onclick = () => {
-  const input = document.createElement('textarea');
-  input.value = msg.text;
-  input.style.width = '90%';
-  input.style.background = '#383a40';
-  input.style.border = 'none';
-  input.style.color = '#fff';
-  input.style.padding = '10px';
-  input.style.borderRadius = '4px';
-  input.style.resize = 'none';
-  input.style.height = '15px';
-  input.style.outline = 'none';
-  input.style.marginTop = '4px'; // space from buttons
-
-  // insert edit box below buttons, not replacing text
-  div.insertBefore(input, div.querySelector('.msg-buttons').nextSibling);
-  input.focus();
-  input.selectionStart = input.selectionEnd = input.value.length;
-
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const newText = input.value.trim();
-      if (!newText && !msg.attachments.length) return;
-      socket.emit('editMessage', { messageId: msg.id, userId: currentUserId, newText }, (res) => {
-        if (res.ok) {
-          msg.text = newText;
-          const textDiv = div.querySelector('.text');
-          textDiv.textContent = newText;
-          const editedTag = document.createElement('span');
-          editedTag.className = 'edited-tag';
-          editedTag.textContent = '(edited)';
-          textDiv.appendChild(editedTag);
-          input.remove();
-        } else {
-          alert(res.error || 'Failed to edit message');
-          input.remove();
-        }
-      });
-    }
-  });
-};
-
-        btns.appendChild(editBtn);
-
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '🗑️';
-        delBtn.title = 'Delete';
-        delBtn.onclick = () => {
-          if (confirm('Delete this message?')) {
-            socket.emit('deleteMessage', { messageId: msg.id, userId: currentUserId }, (res) => {
-              if (!res.ok) alert(res.error || 'Failed to delete message');
-            });
-          }
-        };
-        btns.appendChild(delBtn);
-
-        div.appendChild(btns);
-      }
-
-      const replyBtn = document.createElement('button');
-      replyBtn.textContent = '↩️ Reply';
-      replyBtn.style.position = 'absolute';
-      replyBtn.style.right = '8px';
-      replyBtn.style.bottom = '8px';
-      replyBtn.style.background = 'none';
-      replyBtn.style.border = 'none';
-      replyBtn.style.color = '#999';
-      replyBtn.style.cursor = 'pointer';
-      replyBtn.onclick = () => setReply(msg);
-      div.appendChild(replyBtn);
-
       messageBoard.appendChild(div);
-
       if (autoScroll) messageBoard.scrollTop = messageBoard.scrollHeight;
       updateMessageCounter();
     }
 
-    function setReply(msg) {
-      replyTo = msg;
-      const preview = document.createElement('div');
-      preview.className = 'reply-preview';
-      if (msg.attachments && msg.attachments.length) {
-        const att = msg.attachments[0];
-        if (att.type.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = att.data;
-          preview.appendChild(img);
-        } else {
-          const label = document.createElement('span');
-          label.textContent = `📎 ${att.name}`;
-          preview.appendChild(label);
-        }
-      } else {
-        const text = document.createElement('span');
-        text.textContent = msg.text?.slice(0, 30) || '(no content)';
-        preview.appendChild(text);
+    // Highlight
+    function highlightMessage(id) {
+      const div = document.querySelector(`[data-id="${id}"]`);
+      if (div) {
+        div.style.background = '#5865f2';
+        setTimeout(() => div.style.background = '#2b2d31', 800);
+        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-      const close = document.createElement('span');
-      close.className = 'close-reply';
-      close.textContent = '✕';
-      close.onclick = () => {
-        replyTo = null;
-        preview.remove();
-      };
-      preview.appendChild(close);
-      messageBoard.after(preview);
     }
 
-    fileInput.addEventListener('change', async (e) => {
-      attachments = [];
-      previewContainer.innerHTML = '';
-      for (const file of e.target.files) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const dataUrl = ev.target.result;
-          const item = document.createElement('div');
-          item.className = 'preview-item';
-          if (file.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = dataUrl;
-            item.appendChild(img);
-          } else {
-            item.textContent = `📄 ${file.name}`;
-          }
+    // Image modal
+    function openImageModal(src) {
+      const modal = document.createElement('div');
+      modal.className = 'image-modal';
+      const img = document.createElement('img');
+      img.src = src;
+      modal.appendChild(img);
+      modal.onclick = () => modal.remove();
+      document.body.appendChild(modal);
+    }
 
-          const remove = document.createElement('div');
-          remove.className = 'remove';
-          remove.textContent = '✕';
-          remove.onclick = () => {
-            attachments = attachments.filter(a => a.name !== file.name);
-            item.remove();
-          };
-          item.appendChild(remove);
-          previewContainer.appendChild(item);
-
-          attachments.push({
-            name: file.name,
-            type: file.type,
-            data: dataUrl
-          });
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
+    // Send message
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -613,24 +488,42 @@
       previewContainer.innerHTML = '';
     }
 
-    function highlightMessage(id) {
-      const div = document.querySelector(`[data-id="${id}"]`);
-      if (div) {
-        div.style.background = '#5865f2';
-        setTimeout(() => div.style.background = '#2b2d31', 800);
-        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
+    // File input upload
+    fileInput.addEventListener('change', async e => {
+      const files = e.target.files;
+      if (!files.length) return;
 
-    function openImageModal(src) {
-      const modal = document.createElement('div');
-      modal.className = 'image-modal';
-      const img = document.createElement('img');
-      img.src = src;
-      modal.appendChild(img);
-      modal.onclick = () => modal.remove();
-      document.body.appendChild(modal);
-    }
+      const formData = new FormData();
+      for (const f of files) formData.append('files', f);
+
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!data.ok) return alert('File upload failed');
+
+      attachments = data.files;
+
+      previewContainer.innerHTML = '';
+      attachments.forEach(file => {
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+        if (file.type.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = file.url;
+          item.appendChild(img);
+        } else {
+          item.textContent = `📄 ${file.name}`;
+        }
+        const remove = document.createElement('div');
+        remove.className = 'remove';
+        remove.textContent = '✕';
+        remove.onclick = () => {
+          attachments = attachments.filter(a => a.url !== file.url);
+          item.remove();
+        };
+        item.appendChild(remove);
+        previewContainer.appendChild(item);
+      });
+    });
   </script>
 </body>
 </html>
