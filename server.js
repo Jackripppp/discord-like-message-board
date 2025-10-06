@@ -24,6 +24,10 @@ const upload = multer({ storage });
 app.use(express.static('public'));
 app.use('/uploads', express.static(UPLOAD_DIR));
 
+app.get('/health', (req, res) => {
+  res.send('OK');
+});
+
 let messages = []; // In-memory storage
 
 // File upload endpoint
