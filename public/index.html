@@ -42,10 +42,7 @@
       border-radius: 5px;
       margin-top: 5px;
     }
-    .username {
-      font-weight: bold;
-      color: #00aff4;
-    }
+
     .timestamp {
       font-size: 0.8em;
       color: #aaa;
@@ -160,108 +157,15 @@
 
     let replyTo = null;
 
+
     function createMessageElement(msg) {
       const div = document.createElement('div');
       div.className = 'message';
       div.dataset.id = msg.id;
 
+      // Reply box
       if (msg.replyTo) {
-        const replyDiv = document.createElement('div');
-        replyDiv.className = 'reply-preview';
-        replyDiv.textContent = `Replying to ${msg.replyUser}: ${msg.replyText || '[attachment]'}`;
-        replyDiv.onclick = () => jumpToMessage(msg.replyTo);
-        div.appendChild(replyDiv);
-      }
 
-      const user = document.createElement('span');
-      user.className = 'username';
-      user.textContent = msg.user;
-
-      const time = document.createElement('span');
-      time.className = 'timestamp';
-      time.textContent = ` • ${new Date(msg.timestamp).toLocaleTimeString()}`;
-
-      const content = document.createElement('div');
-      content.innerHTML = msg.text ? msg.text : '';
-
-      div.appendChild(user);
-      div.appendChild(time);
-      div.appendChild(content);
-
-      if (msg.fileUrl) {
-        const fileElement = document.createElement('a');
-        if (msg.fileUrl.match(/\.(jpg|jpeg|png|gif)$/i)) {
-          const img = document.createElement('img');
-          img.src = msg.fileUrl;
-          fileElement.appendChild(img);
-        } else {
-          fileElement.textContent = '📎 ' + msg.fileUrl.split('/').pop();
-          fileElement.href = msg.fileUrl;
-          fileElement.target = '_blank';
-        }
-        div.appendChild(fileElement);
-      }
-
-      const actions = document.createElement('div');
-      actions.className = 'actions';
-      actions.innerHTML = `
-        <button onclick="startReply('${msg.id}', '${msg.user}', '${msg.text?.replace(/'/g, "\\'") || ''}')">↩️</button>
-        <button onclick="editMessage('${msg.id}', '${msg.text?.replace(/'/g, "\\'") || ''}')">✏️</button>
-        <button onclick="deleteMessage('${msg.id}')">🗑️</button>
-      `;
-      div.appendChild(actions);
-      return div;
-    }
-
-    function jumpToMessage(id) {
-      const target = document.querySelector(\`.message[data-id="\${id}"]\`);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        target.classList.add('jump-highlight');
-        setTimeout(() => target.classList.remove('jump-highlight'), 1200);
-      }
-    }
-
-    function renderMessages(messages) {
-      messageBoard.innerHTML = '';
-      messages.forEach(msg => {
-        messageBoard.appendChild(createMessageElement(msg));
-      });
-    }
-
-    socket.on('messages', renderMessages);
-    socket.on('message', msg => {
-      messageBoard.prepend(createMessageElement(msg));
-    });
-    socket.on('updateMessage', msg => {
-      const el = document.querySelector(\`.message[data-id="\${msg.id}"]\`);
-      if (el) el.replaceWith(createMessageElement(msg));
-    });
-    socket.on('deleteMessage', id => {
-      const el = document.querySelector(\`.message[data-id="\${id}"]\`);
-      if (el) el.remove();
-    });
-
-    function startReply(id, user, text) {
-      replyTo = { id, user, text };
-      messageInput.placeholder = \`Replying to \${user}: \${text || '[attachment]'}\`;
-    }
-
-    function editMessage(id, oldText) {
-      const newText = prompt('Edit your message:', oldText);
-      if (newText !== null) socket.emit('editMessage', { id, text: newText });
-    }
-
-    function deleteMessage(id) {
-      if (confirm('Delete this message?')) socket.emit('deleteMessage', id);
-    }
-
-    sendBtn.onclick = async () => {
-      const user = usernameInput.value.trim() || 'Anonymous';
-      const text = messageInput.value.trim();
-      const file = fileInput.files[0];
-
-      if (!text && !file) return;
 
       const formData = new FormData();
       formData.append('user', user);
@@ -280,12 +184,7 @@
       replyTo = null;
     };
 
-    messageInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendBtn.click();
-      }
-    });
+
   </script>
 </body>
 </html>
