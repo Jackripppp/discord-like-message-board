@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Message Board</title>
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       background: #2b2d31;
-      color: #ddd;
+      color: white;
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -17,592 +17,174 @@
     }
     header {
       background: #1e1f22;
-      color: #fff;
       padding: 10px;
       text-align: center;
       font-weight: bold;
-      flex-shrink: 0;
+      border-bottom: 1px solid #3a3b3f;
     }
-    .top-bar {
-      display: flex;
-      align-items: center;
-      padding: 8px 12px;
-      background: #232428;
-    }
-    #username {
-      flex: 0 0 150px;
-      background: #383a40;
-      border: none;
-      color: #fff;
-      padding: 6px;
-      border-radius: 4px;
-      margin-right: 10px;
-    }
-    #message-counter {
-      margin-left: auto;
-      color: #ccc;
-      font-size: 14px;
-    }
-    #message-board {
+    #messageBoard {
       flex: 1;
       overflow-y: auto;
       padding: 10px;
-      background: #313338;
       display: flex;
-      flex-direction: column;
-      position: relative;
+      flex-direction: column-reverse;
     }
     .message {
-      background: #2b2d31;
-      margin-bottom: 10px;
-      padding: 8px 10px;
+      background: #313338;
+      padding: 10px;
       border-radius: 8px;
+      margin: 8px 0;
       position: relative;
-    }
-    .message .name {
-      font-weight: bold;
-      color: #fff;
-    }
-    .message .text {
-      margin-top: 4px;
-      white-space: pre-wrap;
       word-wrap: break-word;
     }
-    .edited-tag {
-      font-size: 11px;
-      color: #999;
-      margin-left: 6px;
+    .message img {
+      max-width: 200px;
+      border-radius: 5px;
+      margin-top: 5px;
     }
-    .reply-box {
-      background: #404249;
-      border-left: 3px solid #5865f2;
-      padding: 4px 6px;
-      margin-bottom: 4px;
-      border-radius: 4px;
-      font-size: 13px;
-      color: #ccc;
+
+    .timestamp {
+      font-size: 0.8em;
+      color: #aaa;
+      margin-left: 5px;
+    }
+    .actions {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      display: flex;
+      gap: 6px;
+    }
+    .actions button {
+      background: transparent;
+      border: none;
+      color: #aaa;
       cursor: pointer;
+      font-size: 0.8em;
+    }
+    .actions button:hover {
+      color: white;
     }
     .reply-preview {
       background: #404249;
-      border-left: 3px solid #5865f2;
-      padding: 4px 6px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 13px;
-      margin-bottom: 5px;
-    }
-    .reply-preview img {
-      max-width: 40px;
-      max-height: 40px;
-      border-radius: 4px;
-      margin-right: 6px;
-    }
-    .close-reply {
-      cursor: pointer;
-      margin-left: 8px;
-      color: #aaa;
-    }
-    .attachment-thumb {
-      margin-top: 5px;
-      max-width: 200px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .attachment-file {
-      display: flex;
-      align-items: center;
-      background: #404249;
-      padding: 5px 8px;
-      border-radius: 4px;
-      margin-top: 5px;
-    }
-    .attachment-file i {
-      margin-right: 6px;
-    }
-    .chat-input {
-      display: flex;
-      padding: 8px;
-      background: #232428;
-      flex-shrink: 0;
-      align-items: center;
-    }
-    #file-input {
-      display: none;
-    }
-    #upload-label {
-      cursor: pointer;
-      color: #bbb;
-      margin-right: 8px;
-      font-size: 20px;
-    }
-    #message-input {
-      flex: 1;
-      background: #383a40;
-      border: none;
-      color: #fff;
-      padding: 10px;
-      border-radius: 4px;
-      resize: none;
-      height: 50px;
-      outline: none;
-    }
-    #send-btn {
-      background: #5865f2;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 10px 14px;
-      margin-left: 8px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .preview-container {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin: 5px 10px;
-    }
-    .preview-item {
-      position: relative;
-      background: #404249;
-      border-radius: 6px;
       padding: 5px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      color: #ccc;
-      font-size: 14px;
-    }
-    .preview-item img {
-      max-width: 60px;
-      max-height: 60px;
-      border-radius: 4px;
-    }
-    .preview-item .remove {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: #333;
-      color: #fff;
-      border-radius: 50%;
-      font-size: 12px;
-      width: 18px;
-      height: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      border-left: 3px solid #00aff4;
+      margin-bottom: 5px;
+      font-size: 0.9em;
+      border-radius: 5px;
       cursor: pointer;
     }
-    .image-modal {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(6px);
+    #inputArea {
       display: flex;
-      justify-content: center;
       align-items: center;
-      z-index: 999;
+      padding: 10px;
+      background: #1e1f22;
+      border-top: 1px solid #3a3b3f;
     }
-    .image-modal img {
-      max-width: 90%;
-      max-height: 90%;
-      border-radius: 8px;
-      transition: transform 0.2s;
-      cursor: zoom-in;
-    }
-    #jump-to-present {
-      position: absolute;
-      bottom: 70px;
-      right: 20px;
-      background: #5865f2;
-      color: white;
-      border: none;
-      border-radius: 20px;
-      padding: 8px 14px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: bold;
+    #fileInput {
       display: none;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      transition: opacity 0.3s;
-      z-index: 10;
     }
-    #jump-to-present:hover {
-      background: #4752c4;
-    }
-    .msg-buttons {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      display: flex;
-      gap: 4px;
-    }
-    .msg-buttons button {
+    #uploadBtn {
       background: none;
       border: none;
-      color: #999;
       cursor: pointer;
-      font-size: 12px;
-      padding: 2px 4px;
-      border-radius: 3px;
-      transition: background 0.2s;
+      font-size: 20px;
+      color: #bbb;
+      margin-right: 8px;
     }
-    .msg-buttons button:hover {
+    #uploadBtn:hover {
+      color: white;
+    }
+    #messageInput {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      background: #383a40;
+      color: white;
+      font-size: 1em;
+      outline: none;
+      resize: none;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    #sendBtn {
+      margin-left: 8px;
+      padding: 10px 16px;
       background: #5865f2;
       color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #sendBtn:hover {
+      background: #4752c4;
+    }
+    #usernameInput {
+      width: 150px;
+      padding: 5px;
+      border-radius: 5px;
+      border: none;
+      margin-right: 10px;
+    }
+    .jump-highlight {
+      outline: 2px solid #00aff4;
+      background: rgba(0, 170, 255, 0.1);
+      transition: background 0.5s ease-out;
     }
   </style>
 </head>
 <body>
   <header>Message Board</header>
-  <div class="top-bar">
-    <input type="text" id="username" placeholder="Enter your name" />
-    <div id="message-counter">0 messages</div>
-  </div>
+  <div id="messageBoard"></div>
 
-  <div id="message-board"></div>
-  <button id="jump-to-present">Jump to Present ↓</button>
-  <div class="preview-container" id="preview-container"></div>
-
-  <div class="chat-input">
-    <label for="file-input" id="upload-label" title="Upload file">📁</label>
-    <input type="file" id="file-input" multiple />
-    <textarea id="message-input" placeholder="Type a message..."></textarea>
-    <button id="send-btn">Post</button>
+  <div id="inputArea">
+    <input id="usernameInput" placeholder="Your name" maxlength="20">
+    <label for="fileInput" id="uploadBtn">📎</label>
+    <input type="file" id="fileInput">
+    <textarea id="messageInput" placeholder="Type a message..."></textarea>
+    <button id="sendBtn">Send</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    const messageBoard = document.getElementById('message-board');
-    const messageInput = document.getElementById('message-input');
-    const sendBtn = document.getElementById('send-btn');
-    const fileInput = document.getElementById('file-input');
-    const previewContainer = document.getElementById('preview-container');
-    const usernameInput = document.getElementById('username');
-    const messageCounter = document.getElementById('message-counter');
-    const jumpToPresentBtn = document.getElementById('jump-to-present');
+    const messageBoard = document.getElementById('messageBoard');
+    const messageInput = document.getElementById('messageInput');
+    const usernameInput = document.getElementById('usernameInput');
+    const fileInput = document.getElementById('fileInput');
+    const sendBtn = document.getElementById('sendBtn');
 
-    const USERNAME_KEY = 'messageBoard_username';
-    try {
-      const savedName = localStorage.getItem(USERNAME_KEY);
-      if (savedName) usernameInput.value = savedName;
-    } catch (err) {}
-
-    usernameInput.addEventListener('input', e => {
-      try { localStorage.setItem(USERNAME_KEY, e.target.value); } catch (err) {}
-    });
-
-    let currentUserId = Math.random().toString(36).slice(2);
     let replyTo = null;
-    let attachments = [];
-    let autoScroll = true;
 
-    function updateMessageCounter() {
-      const count = document.querySelectorAll('.message').length;
-      messageCounter.textContent = `${count} message${count !== 1 ? 's' : ''}`;
-    }
 
-    // Init
-    socket.emit('requestInit');
-    socket.on('initMessages', msgs => {
-      messageBoard.innerHTML = '';
-      msgs.forEach(addMessage);
-      messageBoard.scrollTop = messageBoard.scrollHeight;
-      updateMessageCounter();
-    });
-
-    socket.on('messageCreated', msg => {
-      addMessage(msg);
-      updateMessageCounter();
-    });
-
-    socket.on('messageDeleted', data => {
-      const msgDiv = document.querySelector(`[data-id="${data.id}"]`);
-      if(msgDiv) msgDiv.remove();
-      updateMessageCounter();
-    });
-
-    socket.on('messageEdited', updatedMsg => {
-      const div = document.querySelector(`[data-id="${updatedMsg.id}"]`);
-      if (div) {
-        const textDiv = div.querySelector('.text');
-        textDiv.textContent = updatedMsg.text;
-        if (!div.querySelector('.edited-tag')) {
-          const editedTag = document.createElement('span');
-          editedTag.className = 'edited-tag';
-          editedTag.textContent = '(edited)';
-          textDiv.appendChild(editedTag);
-        }
-      }
-    });
-
-    messageBoard.addEventListener('scroll', () => {
-      const atBottom = messageBoard.scrollTop + messageBoard.clientHeight >= messageBoard.scrollHeight - 20;
-      autoScroll = atBottom;
-      jumpToPresentBtn.style.display = atBottom ? 'none' : 'block';
-    });
-
-    jumpToPresentBtn.addEventListener('click', () => {
-      messageBoard.scrollTo({ top: messageBoard.scrollHeight, behavior: 'smooth' });
-      jumpToPresentBtn.style.display = 'none';
-      autoScroll = true;
-    });
-
-    function addMessage(msg) {
-      if (msg.deleted) return;
+    function createMessageElement(msg) {
       const div = document.createElement('div');
       div.className = 'message';
       div.dataset.id = msg.id;
 
       // Reply box
       if (msg.replyTo) {
-        const replyBox = document.createElement('div');
-        replyBox.className = 'reply-box';
-        const r = msg.replyTo;
-        if (r.attachments && r.attachments.length) {
-          const firstAtt = r.attachments[0];
-          if (firstAtt.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = firstAtt.url;
-            img.style.maxWidth = '40px';
-            img.style.maxHeight = '40px';
-            img.style.borderRadius = '4px';
-            replyBox.appendChild(img);
-          } else {
-            const fileSpan = document.createElement('span');
-            fileSpan.textContent = `📄 ${firstAtt.name || '(file)'}`;
-            replyBox.appendChild(fileSpan);
-          }
-        } else {
-          replyBox.textContent = r.text || '(no content)';
-        }
-        replyBox.onclick = () => highlightMessage(r.id);
-        div.appendChild(replyBox);
-      }
 
-      const name = document.createElement('div');
-      name.className = 'name';
-      name.textContent = msg.name || 'Anonymous';
-      div.appendChild(name);
-
-      const text = document.createElement('div');
-      text.className = 'text';
-      text.textContent = msg.text || '';
-      if (msg.edited) {
-        const editedTag = document.createElement('span');
-        editedTag.className = 'edited-tag';
-        editedTag.textContent = '(edited)';
-        text.appendChild(editedTag);
-      }
-      div.appendChild(text);
-
-      // Attachments
-      if (msg.attachments && msg.attachments.length) {
-        msg.attachments.forEach(att => {
-          if (att.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = att.url;
-            img.className = 'attachment-thumb';
-            img.onclick = () => openImageModal(att.url);
-            div.appendChild(img);
-          } else {
-            const fileDiv = document.createElement('div');
-            fileDiv.className = 'attachment-file';
-            const link = document.createElement('a');
-            link.href = att.url;
-            link.download = att.name;
-            link.textContent = att.name;
-            link.style.color = '#9cdcfe';
-            link.style.textDecoration = 'none';
-            link.target = '_blank';
-            const icon = document.createElement('i');
-            icon.textContent = '📄';
-            icon.style.marginRight = '6px';
-            fileDiv.appendChild(icon);
-            fileDiv.appendChild(link);
-            div.appendChild(fileDiv);
-          }
-        });
-      }
-
-      // Edit/Delete buttons for your own messages
-      // Buttons container
-const btnDiv = document.createElement('div');
-btnDiv.className = 'msg-buttons';
-
-// Reply button (for everyone)
-const replyBtn = document.createElement('button');
-replyBtn.textContent = 'Reply';
-replyBtn.onclick = () => setReply(msg);
-btnDiv.appendChild(replyBtn);
-
-// Only add Edit/Delete if it's your message
-if (msg.userId === currentUserId) {
-  const editBtn = document.createElement('button');
-  editBtn.textContent = 'Edit';
-  editBtn.onclick = () => editMessage(msg.id, text, msg);
-  btnDiv.appendChild(editBtn);
-
-  const delBtn = document.createElement('button');
-  delBtn.textContent = 'Delete';
-  delBtn.onclick = () => deleteMessage(msg.id);
-  btnDiv.appendChild(delBtn);
-}
-
-div.appendChild(btnDiv);
-
-
-      messageBoard.appendChild(div);
-      if (autoScroll) messageBoard.scrollTop = messageBoard.scrollHeight;
-      updateMessageCounter();
-    }
-
-    function setReply(msg) {
-      replyTo = msg;
-      previewContainer.innerHTML = '';
-
-      const preview = document.createElement('div');
-      preview.className = 'reply-preview';
-
-      if (msg.attachments && msg.attachments.length) {
-        const att = msg.attachments[0];
-        if (att.type.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = att.url;
-          preview.appendChild(img);
-        } else {
-          const fileSpan = document.createElement('span');
-          fileSpan.textContent = `📄 ${att.name}`;
-          preview.appendChild(fileSpan);
-        }
-      } else {
-        const textSpan = document.createElement('span');
-        textSpan.textContent = msg.text || '(no content)';
-        preview.appendChild(textSpan);
-      }
-
-      const close = document.createElement('span');
-      close.className = 'close-reply';
-      close.textContent = '✕';
-      close.onclick = () => {
-        replyTo = null;
-        previewContainer.innerHTML = '';
-      };
-      preview.appendChild(close);
-
-      preview.onclick = e => {
-        if (e.target !== close) highlightMessage(msg.id);
-      };
-
-      previewContainer.appendChild(preview);
-    }
-
-    function highlightMessage(id) {
-      const div = document.querySelector(`[data-id="${id}"]`);
-      if (div) {
-        div.style.background = '#5865f2';
-        setTimeout(() => div.style.background = '#2b2d31', 800);
-        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-
-    function openImageModal(src) {
-      const modal = document.createElement('div');
-      modal.className = 'image-modal';
-      const img = document.createElement('img');
-      img.src = src;
-      modal.appendChild(img);
-      modal.onclick = () => modal.remove();
-      document.body.appendChild(modal);
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    function sendMessage() {
-      const text = messageInput.value.trim();
-      if (!text && !attachments.length) return;
-      const msg = {
-        id: Math.random().toString(36).slice(2),
-        userId: currentUserId,
-        name: usernameInput.value || 'Anonymous',
-        text,
-        time: new Date().toISOString(),
-        attachments,
-        replyTo: replyTo ? {
-          id: replyTo.id,
-          text: replyTo.text,
-          attachments: replyTo.attachments
-        } : null
-      };
-      socket.emit('sendMessage', msg, res => {
-        if (!res.ok) alert(res.error || 'Failed to send message');
-      });
-      messageInput.value = '';
-      replyTo = null;
-      attachments = [];
-      previewContainer.innerHTML = '';
-    }
-
-    async function handleFileInput(e) {
-      const files = e.target.files;
-      if (!files.length) return;
 
       const formData = new FormData();
-      for (const f of files) formData.append('files', f);
+      formData.append('user', user);
+      formData.append('text', text);
+      if (replyTo) {
+        formData.append('replyTo', replyTo.id);
+        formData.append('replyUser', replyTo.user);
+        formData.append('replyText', replyTo.text);
+      }
+      if (file) formData.append('file', file);
 
-      const res = await fetch('/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!data.ok) return alert('File upload failed');
+      await fetch('/upload', { method: 'POST', body: formData });
+      messageInput.value = '';
+      fileInput.value = '';
+      messageInput.placeholder = 'Type a message...';
+      replyTo = null;
+    };
 
-      attachments = data.files;
 
-      previewContainer.innerHTML = '';
-      attachments.forEach(file => {
-        const item = document.createElement('div');
-        item.className = 'preview-item';
-        if (file.type.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = file.url;
-          item.appendChild(img);
-        } else {
-          item.textContent = `📄 ${file.name}`;
-        }
-        const remove = document.createElement('div');
-        remove.className = 'remove';
-        remove.textContent = '✕';
-        remove.onclick = () => {
-          attachments = attachments.filter(a => a.url !== file.url);
-          item.remove();
-        };
-        item.appendChild(remove);
-        previewContainer.appendChild(item);
-      });
-    }
-
-    fileInput.addEventListener('change', handleFileInput);
-
-    function editMessage(id, textDiv, msg) {
-      const newText = prompt('Edit your message:', msg.text);
-      if (newText === null) return;
-      socket.emit('editMessage', { id, text: newText });
-    }
-
-    function deleteMessage(id) {
-      if (!confirm('Delete this message?')) return;
-      socket.emit('deleteMessage', { id });
-    }
   </script>
 </body>
 </html>
