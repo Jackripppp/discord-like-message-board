@@ -28,7 +28,7 @@ app.use('/uploads', express.static(UPLOAD_DIR));
 app.get('/health', (req, res) => res.send('OK'));
 
 // --- SQLite setup ---
-const db = new sqlite3.Database(path.join(__dirname, 'messages.db'), (err) => {
+const db = new sqlite3.Database(path.join('/data', 'messages.db'), (err) => {
   if (err) console.error(err);
   else console.log('Connected to SQLite database');
 });
