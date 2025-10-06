@@ -51,14 +51,14 @@ db.run(`
 `);
 
 // --- File upload endpoint ---
-app.post('/upload', upload.array('files'), (req, res) => {
-  if (!req.files) return res.json({ ok: false });
-  const files = req.files.map(f => ({
-    name: f.originalname,
-    type: f.mimetype,
-    url: `/uploads/${f.filename}`
-  }));
-  res.json({ ok: true, files });
+app.post('/upload', upload.single('file'), (req, res) => {
+  if (!req.file) return res.json({ ok: false });
+  const file = {
+    name: req.file.originalname,
+    type: req.file.mimetype,
+    url: `/uploads/${req.file.filename}`
+  };
+  res.json({ ok: true, file });
 });
 
 // --- Socket.IO events ---
