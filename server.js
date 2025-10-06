@@ -13,7 +13,7 @@ const io = new Server(server);
 const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// Multer setup for file uploads
+// --- Multer setup for file uploads ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
@@ -50,7 +50,7 @@ db.run(`
   )
 `);
 
-// --- File upload endpoint ---
+// --- File upload endpoint (single file) ---
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) return res.json({ ok: false });
   const file = {
