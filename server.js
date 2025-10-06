@@ -1,150 +1,158 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const fs = require('fs');
+const multer = require('multer');
 const path = require('path');
-
-const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'messages.json');
-const MAX_MESSAGES = 500;
-
-// load messages from disk (if any)
-let messages = [];
-try {
-  if (fs.existsSync(DATA_FILE)) {
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    messages = JSON.parse(raw) || [];
-  }
-} catch (err) {
-  console.warn('Could not read messages.json:', err);
-  messages = [];
-}
-
-function persist() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Failed to persist messages:', e);
-  }
-}
+const fs = require('fs');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// serve static files in "public"
-app.use(express.static(path.join(__dirname, 'public')));
+const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// simple health route
+// Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.random().toString(36).slice(2);
+    cb(null, unique + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage });
+
+app.use(express.static('public'));
+app.use('/uploads', express.static(UPLOAD_DIR));
 app.get('/health', (req, res) => res.send('OK'));
 
-// helper to trim messages
-function capMessages() {
-  if (messages.length > MAX_MESSAGES) {
-    messages = messages.slice(messages.length - MAX_MESSAGES);
-  }
-}
+// --- SQLite setup ---
+const db = new sqlite3.Database(path.join(__dirname, 'messages.db'), (err) => {
+  if (err) console.error(err);
+  else console.log('Connected to SQLite database');
+});
 
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  // On connection we expect client to request initial data
-  // We'll send the current message list
+// Create messages table if not exists
+db.run(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    userId TEXT,
+    name TEXT,
+    text TEXT,
+    time TEXT,
+    attachments TEXT,
+    replyTo TEXT,
+    deleted INTEGER DEFAULT 0,
+    edited INTEGER DEFAULT 0,
+    editTime TEXT,
+    deleteTime TEXT
+  )
+`);
+
+// --- File upload endpoint ---
+app.post('/upload', upload.array('files'), (req, res) => {
+  if (!req.files) return res.json({ ok: false });
+  const files = req.files.map(f => ({
+    name: f.originalname,
+    type: f.mimetype,
+    url: `/uploads/${f.filename}`
+  }));
+  res.json({ ok: true, files });
+});
+
+// --- Socket.IO events ---
+io.on('connection', socket => {
+
+  // Send last 500 non-deleted messages to new client
   socket.on('requestInit', () => {
-    socket.emit('initMessages', messages);
+    db.all('SELECT * FROM messages WHERE deleted = 0 ORDER BY time ASC LIMIT 500', (err, rows) => {
+      if (err) return console.error(err);
+      const messages = rows.map(r => ({
+        ...r,
+        attachments: r.attachments ? JSON.parse(r.attachments) : [],
+        replyTo: r.replyTo ? JSON.parse(r.replyTo) : null,
+        deleted: !!r.deleted,
+        edited: !!r.edited
+      }));
+      socket.emit('initMessages', messages);
+    });
   });
 
-  // New message received
-  socket.on('sendMessage', (msg, ack) => {
-    try {
-      // msg should include: id, userId, name, text, time, attachments[]
-      // Basic validation:
-      if (!msg || !msg.id || !msg.userId) {
-        return ack && ack({ ok: false, error: 'Invalid message payload' });
+  // New message
+  socket.on('sendMessage', (msg, cb) => {
+    const stmt = db.prepare(`
+      INSERT INTO messages (id, userId, name, text, time, attachments, replyTo)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+      msg.id,
+      msg.userId,
+      msg.name,
+      msg.text,
+      msg.time,
+      JSON.stringify(msg.attachments || []),
+      msg.replyTo ? JSON.stringify(msg.replyTo) : null,
+      (err) => {
+        if (err) return cb({ ok: false });
+        io.emit('messageCreated', msg);
+        cb({ ok: true });
+
+        // Enforce 500-message cap (delete oldest messages)
+        db.get('SELECT COUNT(*) as count FROM messages WHERE deleted = 0', (err, row) => {
+          if (err) return console.error(err);
+          const excess = row.count - 500;
+          if (excess > 0) {
+            db.run(`
+              DELETE FROM messages WHERE id IN (
+                SELECT id FROM messages WHERE deleted = 0 ORDER BY time ASC LIMIT ?
+              )
+            `, [excess], (err) => {
+              if (err) console.error(err);
+            });
+          }
+        });
       }
-      // enforce small limits (prevent huge payloads)
-      if (typeof msg.text === 'string' && msg.text.length > 20000) msg.text = msg.text.slice(0, 20000);
-
-      // attachments: keep but sanitize: only store name, type, data (dataURL)
-      if (!Array.isArray(msg.attachments)) msg.attachments = [];
-
-      msg.deleted = false; // deleted flag
-      msg.edited = false;  // edited flag
-
-      messages.push(msg);
-      capMessages();
-      persist();
-
-      // broadcast to everyone
-      io.emit('messageCreated', msg);
-      ack && ack({ ok: true });
-    } catch (err) {
-      console.error('sendMessage error', err);
-      ack && ack({ ok: false, error: 'server error' });
-    }
+    );
   });
 
-  // Edit a message
-  socket.on('editMessage', (payload, ack) => {
-    // payload: { messageId, userId, newText }
-    try {
-      const { messageId, userId, newText } = payload || {};
-      const idx = messages.findIndex(m => m.id === messageId);
-      if (idx === -1) return ack && ack({ ok: false, error: 'Message not found' });
-
-      const msg = messages[idx];
-
-      // permission check: only owner can edit
-      if (msg.userId !== userId) return ack && ack({ ok: false, error: 'Not allowed' });
-
-      // apply edit
-      msg.text = typeof newText === 'string' ? newText : msg.text;
-      msg.edited = true;
-      msg.editTime = new Date().toISOString();
-
-      messages[idx] = msg;
-      persist();
-
-      io.emit('messageEdited', msg);
-      ack && ack({ ok: true, msg });
-    } catch (err) {
-      console.error('editMessage err', err);
-      ack && ack({ ok: false, error: 'server error' });
-    }
+  // Edit message
+  socket.on('editMessage', ({ id, text, userId }, cb) => {
+    db.run(`
+      UPDATE messages
+      SET text = ?, edited = 1, editTime = ?
+      WHERE id = ? AND userId = ?
+    `, [text, new Date().toISOString(), id, userId], function(err) {
+      if (err || this.changes === 0) return cb({ ok: false, error: 'Message not found or not yours' });
+      db.get('SELECT * FROM messages WHERE id = ?', [id], (err, row) => {
+        if (err) return console.error(err);
+        const msg = {
+          ...row,
+          attachments: row.attachments ? JSON.parse(row.attachments) : [],
+          replyTo: row.replyTo ? JSON.parse(row.replyTo) : null,
+          deleted: !!row.deleted,
+          edited: !!row.edited
+        };
+        io.emit('messageEdited', msg);
+        cb({ ok: true });
+      });
+    });
   });
 
-  // Delete a message
-  socket.on('deleteMessage', (payload, ack) => {
-    // payload: { messageId, userId }
-    try {
-      const { messageId, userId } = payload || {};
-      const idx = messages.findIndex(m => m.id === messageId);
-      if (idx === -1) return ack && ack({ ok: false, error: 'Message not found' });
-
-      const msg = messages[idx];
-
-      // permission: only owner can delete
-      if (msg.userId !== userId) return ack && ack({ ok: false, error: 'Not allowed' });
-
-      // Instead of fully removing, mark deleted (so clients that already have it can show "deleted")
-      msg.deleted = true;
-      msg.deleteTime = new Date().toISOString();
-
-      messages[idx] = msg;
-      persist();
-
-      io.emit('messageDeleted', { id: messageId, deleteTime: msg.deleteTime });
-      ack && ack({ ok: true });
-    } catch (err) {
-      console.error('deleteMessage err', err);
-      ack && ack({ ok: false, error: 'server error' });
-    }
+  // Delete message
+  socket.on('deleteMessage', ({ id, userId }, cb) => {
+    db.run(`
+      UPDATE messages
+      SET deleted = 1, deleteTime = ?
+      WHERE id = ? AND userId = ?
+    `, [new Date().toISOString(), id, userId], function(err) {
+      if (err || this.changes === 0) return cb({ ok: false, error: 'Message not found or not yours' });
+      io.emit('messageDeleted', { id });
+      cb({ ok: true });
+    });
   });
 
-  // For debugging: expose messages count on disconnect
-  socket.on('disconnect', () => {});
 });
 
-server.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
