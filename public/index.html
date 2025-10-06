@@ -42,7 +42,6 @@
       border-radius: 5px;
       margin-top: 5px;
     }
-
     .username {
       font-weight: bold;
       color: #00aff4;
@@ -68,17 +67,6 @@
     }
     .actions button:hover {
       color: white;
-=======
-    .reply-box {
-      background: #404249;
-      border-left: 3px solid #5865f2;
-      padding: 4px 6px;
-      margin-bottom: 4px;
-      border-radius: 4px;
-      font-size: 13px;
-      color: #ccc;
-      cursor: pointer;
-
     }
     .reply-preview {
       background: #404249;
@@ -172,70 +160,12 @@
 
     let replyTo = null;
 
-
     function createMessageElement(msg) {
-
-    function updateMessageCounter() {
-      const count = document.querySelectorAll('.message').length;
-      messageCounter.textContent = `${count} message${count !== 1 ? 's' : ''}`;
-    }
-
-    // Init
-    socket.emit('requestInit');
-    socket.on('initMessages', msgs => {
-      messageBoard.innerHTML = '';
-      msgs.forEach(addMessage);
-      messageBoard.scrollTop = messageBoard.scrollHeight;
-      updateMessageCounter();
-    });
-
-    socket.on('messageCreated', msg => {
-      addMessage(msg);
-      updateMessageCounter();
-    });
-
-    socket.on('messageDeleted', data => {
-      const msgDiv = document.querySelector(`[data-id="${data.id}"]`);
-      if(msgDiv) msgDiv.remove();
-      updateMessageCounter();
-    });
-
-    socket.on('messageEdited', updatedMsg => {
-      const div = document.querySelector(`[data-id="${updatedMsg.id}"]`);
-      if (div) {
-        const textDiv = div.querySelector('.text');
-        textDiv.textContent = updatedMsg.text;
-        if (!div.querySelector('.edited-tag')) {
-          const editedTag = document.createElement('span');
-          editedTag.className = 'edited-tag';
-          editedTag.textContent = '(edited)';
-          textDiv.appendChild(editedTag);
-        }
-      }
-    });
-
-    messageBoard.addEventListener('scroll', () => {
-      const atBottom = messageBoard.scrollTop + messageBoard.clientHeight >= messageBoard.scrollHeight - 20;
-      autoScroll = atBottom;
-      jumpToPresentBtn.style.display = atBottom ? 'none' : 'block';
-    });
-
-    jumpToPresentBtn.addEventListener('click', () => {
-      messageBoard.scrollTo({ top: messageBoard.scrollHeight, behavior: 'smooth' });
-      jumpToPresentBtn.style.display = 'none';
-      autoScroll = true;
-    });
-
-    function addMessage(msg) {
-      if (msg.deleted) return;
-
       const div = document.createElement('div');
       div.className = 'message';
       div.dataset.id = msg.id;
 
-      // Reply box
       if (msg.replyTo) {
-
         const replyDiv = document.createElement('div');
         replyDiv.className = 'reply-preview';
         replyDiv.textContent = `Replying to ${msg.replyUser}: ${msg.replyText || '[attachment]'}`;
@@ -264,36 +194,12 @@
           const img = document.createElement('img');
           img.src = msg.fileUrl;
           fileElement.appendChild(img);
-
-        const replyBox = document.createElement('div');
-        replyBox.className = 'reply-box';
-        const r = msg.replyTo;
-        if (r.attachments && r.attachments.length) {
-          const firstAtt = r.attachments[0];
-          if (firstAtt.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = firstAtt.url;
-            img.style.maxWidth = '40px';
-            img.style.maxHeight = '40px';
-            img.style.borderRadius = '4px';
-            replyBox.appendChild(img);
-          } else {
-            const fileSpan = document.createElement('span');
-            fileSpan.textContent = `📄 ${firstAtt.name || '(file)'}`;
-            replyBox.appendChild(fileSpan);
-          }
-
         } else {
           fileElement.textContent = '📎 ' + msg.fileUrl.split('/').pop();
           fileElement.href = msg.fileUrl;
           fileElement.target = '_blank';
         }
-
         div.appendChild(fileElement);
-
-        replyBox.onclick = () => highlightMessage(r.id);
-        div.appendChild(replyBox);
-
       }
 
       const actions = document.createElement('div');
@@ -316,7 +222,6 @@
       }
     }
 
-
     function renderMessages(messages) {
       messageBoard.innerHTML = '';
       messages.forEach(msg => {
@@ -336,127 +241,6 @@
       const el = document.querySelector(\`.message[data-id="\${id}"]\`);
       if (el) el.remove();
     });
-
-      // Attachments
-      if (msg.attachments && msg.attachments.length) {
-        msg.attachments.forEach(att => {
-          if (att.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = att.url;
-            img.className = 'attachment-thumb';
-            img.onclick = () => openImageModal(att.url);
-            div.appendChild(img);
-          } else {
-            const fileDiv = document.createElement('div');
-            fileDiv.className = 'attachment-file';
-            const link = document.createElement('a');
-            link.href = att.url;
-            link.download = att.name;
-            link.textContent = att.name;
-            link.style.color = '#9cdcfe';
-            link.style.textDecoration = 'none';
-            link.target = '_blank';
-            const icon = document.createElement('i');
-            icon.textContent = '📄';
-            icon.style.marginRight = '6px';
-            fileDiv.appendChild(icon);
-            fileDiv.appendChild(link);
-            div.appendChild(fileDiv);
-          }
-        });
-      }
-
-      // Edit/Delete buttons for your own messages
-      // Buttons container
-const btnDiv = document.createElement('div');
-btnDiv.className = 'msg-buttons';
-
-// Reply button (for everyone)
-const replyBtn = document.createElement('button');
-replyBtn.textContent = 'Reply';
-replyBtn.onclick = () => setReply(msg);
-btnDiv.appendChild(replyBtn);
-
-// Only add Edit/Delete if it's your message
-if (msg.userId === currentUserId) {
-  const editBtn = document.createElement('button');
-  editBtn.textContent = 'Edit';
-  editBtn.onclick = () => editMessage(msg.id, text, msg);
-  btnDiv.appendChild(editBtn);
-
-  const delBtn = document.createElement('button');
-  delBtn.textContent = 'Delete';
-  delBtn.onclick = () => deleteMessage(msg.id);
-  btnDiv.appendChild(delBtn);
-}
-
-div.appendChild(btnDiv);
-
-
-      messageBoard.appendChild(div);
-      if (autoScroll) messageBoard.scrollTop = messageBoard.scrollHeight;
-      updateMessageCounter();
-    }
-
-    function setReply(msg) {
-      replyTo = msg;
-      previewContainer.innerHTML = '';
-
-      const preview = document.createElement('div');
-      preview.className = 'reply-preview';
-
-      if (msg.attachments && msg.attachments.length) {
-        const att = msg.attachments[0];
-        if (att.type.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = att.url;
-          preview.appendChild(img);
-        } else {
-          const fileSpan = document.createElement('span');
-          fileSpan.textContent = `📄 ${att.name}`;
-          preview.appendChild(fileSpan);
-        }
-      } else {
-        const textSpan = document.createElement('span');
-        textSpan.textContent = msg.text || '(no content)';
-        preview.appendChild(textSpan);
-      }
-
-      const close = document.createElement('span');
-      close.className = 'close-reply';
-      close.textContent = '✕';
-      close.onclick = () => {
-        replyTo = null;
-        previewContainer.innerHTML = '';
-      };
-      preview.appendChild(close);
-
-      preview.onclick = e => {
-        if (e.target !== close) highlightMessage(msg.id);
-      };
-
-      previewContainer.appendChild(preview);
-    }
-
-    function highlightMessage(id) {
-      const div = document.querySelector(`[data-id="${id}"]`);
-      if (div) {
-        div.style.background = '#5865f2';
-        setTimeout(() => div.style.background = '#2b2d31', 800);
-        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-
-    function openImageModal(src) {
-      const modal = document.createElement('div');
-      modal.className = 'image-modal';
-      const img = document.createElement('img');
-      img.src = src;
-      modal.appendChild(img);
-      modal.onclick = () => modal.remove();
-      document.body.appendChild(modal);
-    }
-
 
     function startReply(id, user, text) {
       replyTo = { id, user, text };
@@ -502,81 +286,6 @@ div.appendChild(btnDiv);
         sendBtn.click();
       }
     });
-
-
-    function sendMessage() {
-      const text = messageInput.value.trim();
-      if (!text && !attachments.length) return;
-      const msg = {
-        id: Math.random().toString(36).slice(2),
-        userId: currentUserId,
-        name: usernameInput.value || 'Anonymous',
-        text,
-        time: new Date().toISOString(),
-        attachments,
-        replyTo: replyTo ? {
-          id: replyTo.id,
-          text: replyTo.text,
-          attachments: replyTo.attachments
-        } : null
-      };
-      socket.emit('sendMessage', msg, res => {
-        if (!res.ok) alert(res.error || 'Failed to send message');
-      });
-      messageInput.value = '';
-      replyTo = null;
-      attachments = [];
-      previewContainer.innerHTML = '';
-    }
-
-    async function handleFileInput(e) {
-      const files = e.target.files;
-      if (!files.length) return;
-
-      const formData = new FormData();
-      for (const f of files) formData.append('files', f);
-
-      const res = await fetch('/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!data.ok) return alert('File upload failed');
-
-      attachments = data.files;
-
-      previewContainer.innerHTML = '';
-      attachments.forEach(file => {
-        const item = document.createElement('div');
-        item.className = 'preview-item';
-        if (file.type.startsWith('image/')) {
-          const img = document.createElement('img');
-          img.src = file.url;
-          item.appendChild(img);
-        } else {
-          item.textContent = `📄 ${file.name}`;
-        }
-        const remove = document.createElement('div');
-        remove.className = 'remove';
-        remove.textContent = '✕';
-        remove.onclick = () => {
-          attachments = attachments.filter(a => a.url !== file.url);
-          item.remove();
-        };
-        item.appendChild(remove);
-        previewContainer.appendChild(item);
-      });
-    }
-
-    fileInput.addEventListener('change', handleFileInput);
-
-    function editMessage(id, textDiv, msg) {
-      const newText = prompt('Edit your message:', msg.text);
-      if (newText === null) return;
-      socket.emit('editMessage', { id, text: newText });
-    }
-
-    function deleteMessage(id) {
-      if (!confirm('Delete this message?')) return;
-      socket.emit('deleteMessage', { id });
-    }
   </script>
 </body>
 </html>
