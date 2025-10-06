@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Message Board</title>
   <style>
     body {
@@ -157,7 +157,6 @@
     const usernameInput = document.getElementById('usernameInput');
     const fileInput = document.getElementById('fileInput');
     const sendBtn = document.getElementById('sendBtn');
-
     let replyTo = null;
 
     function createMessageElement(msg) {
@@ -188,12 +187,8 @@
       div.appendChild(time);
       div.appendChild(content);
 
-      // Handle attached file (any type)
       if (msg.fileUrl) {
         const fileElement = document.createElement('a');
-        fileElement.style.display = 'block';
-        fileElement.style.marginTop = '6px';
-
         if (msg.fileUrl.match(/\.(jpg|jpeg|png|gif)$/i)) {
           const img = document.createElement('img');
           img.src = msg.fileUrl;
@@ -264,31 +259,29 @@
       const user = usernameInput.value.trim() || 'Anonymous';
       const text = messageInput.value.trim();
       const file = fileInput.files[0];
-
       if (!text && !file) return;
-
-      const formData = new FormData();
-      formData.append('user', user);
-      formData.append('text', text);
-
-      if (replyTo) {
-        formData.append('replyTo', replyTo.id);
-        formData.append('replyUser', replyTo.user);
-        formData.append('replyText', replyTo.text);
-      }
 
       let fileUrl = null;
       if (file) {
-        const uploadForm = new FormData();
-        uploadForm.append('file', file);
-        const uploadRes = await fetch('/upload', { method: 'POST', body: uploadForm });
-        const uploadData = await uploadRes.json();
-        if (uploadData.ok && uploadData.file) fileUrl = uploadData.file.url;
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        const uploadRes = await fetch('/upload', { method: 'POST', body: uploadData });
+        const uploadJson = await uploadRes.json();
+        if (uploadJson.ok) fileUrl = uploadJson.file.url;
       }
 
-      await fetch('/upload', { method: 'POST', body: formData });
-      socket.emit('message', { user, text, fileUrl, timestamp: Date.now(), id: Date.now().toString() });
+      const msg = {
+        id: Math.random().toString(36).slice(2),
+        user,
+        text,
+        timestamp: Date.now(),
+        fileUrl,
+        replyTo: replyTo ? replyTo.id : null,
+        replyUser: replyTo ? replyTo.user : null,
+        replyText: replyTo ? replyTo.text : null
+      };
 
+      socket.emit('sendMessage', msg);
       messageInput.value = '';
       fileInput.value = '';
       messageInput.placeholder = 'Type a message...';
